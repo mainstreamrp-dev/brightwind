@@ -1,0 +1,24 @@
+name: tbrightwind-mrp
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pandas
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - requests
+  - scipy
+  - pytest
+  - six
+  - python-dateutil
+  - ipywidgets
+  - ipython
+  - gmaps
+  - colormap
+  - easydev
+  - jsonschema
+  - jinja2
+
+  - pip:
+    - git+git://github.com/mainstreamrp-dev/brightwind@master
