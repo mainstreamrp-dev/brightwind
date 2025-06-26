@@ -1044,7 +1044,7 @@ class Shear:
                 if self.calc_method == 'power_law':
                     scaled_wspds[i] = Shear._scale(wspds=by_sector[i]['Unscaled_Wind_Speeds'], height=height,
                                                    shear_to=shear_to,
-                                                   calc_method=self.calc_method, alpha=self.alpha[i])
+                                                   calc_method=self.calc_method, alpha=self.alpha.iloc[i])
 
                 elif self.calc_method == 'log_law':
                     scaled_wspds[i] = Shear._scale(wspds=by_sector[i]['Unscaled_Wind_Speeds'], height=height,

@@ -2323,7 +2323,7 @@ def apply_cleaning(data, cleaning_file_or_df, inplace=False, sensor_col_name='Se
         else:
             for col in data.columns:
                 if col.find(cleaning_df[sensor_col_name][k]) == 0:
-                    data[col][(data.index >= date_from) & (data.index < date_to)] = replacement_text
+                    data.loc[(data.index >= date_from) & (data.index < date_to),col] = replacement_text
         pd.options.mode.chained_assignment = 'warn'
 
     return data
