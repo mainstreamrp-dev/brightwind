@@ -294,11 +294,11 @@ def test_freq_str_to_dateoffset():
     periods = ['1S', '1min', '5min', '10min', '15min',
                '1h', '3h', '6h', '1D', '7D',
                '1W', '2W', '1MS', '1M', '3M', '6MS',
-               '1AS', '1A', '3A']
+               '1YS']
     results = [1.0, 60.0, 300.0, 600.0, 900.0,
                3600.0, 10800.0, 21600.0, 86400.0, 604800.0,
                604800.0, 1209600.0, 2678400.0, 2678400.0, 7862400.0, 15724800.0,
-               31622400.0, 31622400.0, 94694400.0]
+               31622400.0]
 
     for idx, period in enumerate(periods):
         if type(bw.transform.transform._freq_str_to_dateoffset(period)) == pd.DateOffset:
@@ -313,7 +313,7 @@ def test_freq_str_to_dateoffset():
 
 def test_round_timestamp_down_to_averaging_prd():
     timestamp = pd.Timestamp('2016-01-09 11:21:11')
-    avg_periods = ['10min', '15min', '1h', '3h', '6h', '1D', '7D', '1W', '1MS', '1AS']
+    avg_periods = ['10min', '15min', '1h', '3h', '6h', '1D', '7D', '1W', '1MS', '1YS']
     avg_period_start_timestamps = ['2016-1-9 11:20:00', '2016-1-9 11:15:00', '2016-1-9 11:00:00',
                                    '2016-1-9 9:00:00', '2016-1-9 6:00:00', '2016-1-9', '2016-1-9',  '2016-1-9',
                                    '2016-1', '2016']
@@ -340,7 +340,7 @@ def test_get_data_resolution():
     series1 = bw.average_data_by_period(DATA['Spd80mN'], period='1M', coverage_threshold=0, return_coverage=False)
     assert bw.transform.transform._get_data_resolution(series1.index).kwds == {'months': 1}
 
-    series1 = bw.average_data_by_period(DATA['Spd80mN'], period='1AS', coverage_threshold=0, return_coverage=False)
+    series1 = bw.average_data_by_period(DATA['Spd80mN'], period='1YS', coverage_threshold=0, return_coverage=False)
     assert bw.transform.transform._get_data_resolution(series1.index).kwds == {'years': 1}
 
     # hourly series with one instance where difference between adjacent timestamps is 10 min
@@ -623,7 +623,7 @@ def test_average_data_by_period():
     assert average_monthly_speed[1].count().wspd_Coverage == 12  # the returned coverage has 12 months
 
     # test average annual wind speed
-    average_annual_speed = bw.average_data_by_period(dummy_data.wspd, period='1AS')
+    average_annual_speed = bw.average_data_by_period(dummy_data.wspd, period='1YS')
     assert round(average_annual_speed.iloc[0].item(), 3) == 6.506
     # average DATA to monthly
     data_monthly = bw.average_data_by_period(DATA_CLND[WSPD_COLS + WDIR_COLS], period='1MS',

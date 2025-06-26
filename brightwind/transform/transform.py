@@ -44,9 +44,7 @@ def _freq_str_to_dateoffset(period):
         as_dateoffset = pd.DateOffset(months=int(period[:-1]))
     elif period[-2:] == 'MS':
         as_dateoffset = pd.DateOffset(months=int(period[:-2]))
-    elif period[-1] == 'A':
-        as_dateoffset = pd.DateOffset(years=float(period[:-1]))
-    elif period[-2:] == 'AS':
+    elif period[-2:] == 'YS':
         as_dateoffset = pd.DateOffset(years=float(period[:-2]))
     elif period[-1:] == 'W':
         as_dateoffset = pd.DateOffset(weeks=float(period[:-1]))
@@ -61,7 +59,7 @@ def _freq_str_to_dateoffset(period):
     elif period[-1:] == 'S':
         as_dateoffset = pd.DateOffset(seconds=float(period[:-1]))
     else:
-        raise ValueError('"{}" period not recognized. Only units "M", "MS", "A", "AS", "W", "D", "H", "T", "min", "S" '
+        raise ValueError('"{}" period not recognized. Only units "M", "MS", "YS", "W", "D", "h", "T", "min", "S" '
                          'are recognized'.format(period))
     return as_dateoffset
 
@@ -170,7 +168,7 @@ def _round_timestamp_down_to_averaging_prd(timestamp, period):
 
     :param timestamp: Timestamp to round down from.
     :type timestamp:  pd.Timestamp
-    :param period:    Averaging period e.g. '10min', '1h', '3h', '6h', '1D', '7D', '1W', '1MS', '1AS'
+    :param period:    Averaging period e.g. '10min', '1h', '3h', '6h', '1D', '7D', '1W', '1MS', '1YS'
     :type period:     str
     :return:          Timestamp to represent the start of an averaging period which covers the timestamp.
     :rtype:           str
@@ -198,7 +196,7 @@ def _round_timestamp_down_to_averaging_prd(timestamp, period):
                                              hour=timestamp.hour)
     elif period[-1] == 'M' or period[-2:] == 'MS':
         return '{year}-{month}'.format(year=timestamp.year, month=timestamp.month)
-    elif period[-2:] == 'AS' or period[-1:] == 'A':
+    elif period[-2:] == 'YS' or period[-1:] == 'A':
         return '{year}'.format(year=timestamp.year)
     else:
         print("Warning: Averaging period not identified returning default timestamps")
@@ -404,7 +402,7 @@ def average_data_by_period(data, period, wdir_column_names=None, aggregation_met
         if period[-1] == 'A':
             period = period+'S'
         if period[-1] == 'Y':
-            raise TypeError("Please use '1AS' for annual frequency at the start of the year.")
+            raise TypeError("Please use '1YS' for annual frequency at the start of the year.")
     
     # Check that the data resolution is not less than the period specified
     if data_resolution is None:
