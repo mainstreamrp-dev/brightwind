@@ -139,9 +139,9 @@ def test_sector_ratio():
 def test_basic_stats():
     bw.basic_stats(DATA)
     bs2 = bw.basic_stats(DATA['Spd80mN'])
-    assert (bs2['count'][0] == 95180.0) and (round(bs2['mean'][0], 6) == 7.518636) and \
-           (round(bs2['std'][0], 6) == 3.994552) and (round(bs2['min'][0], 3) == 0.215) and \
-           (round(bs2['max'][0], 1) == 29.0)
+    assert (bs2['count'].iloc[0] == 95180.0) and (round(bs2['mean'].iloc[0], 6) == 7.518636) and \
+           (round(bs2['std'].iloc[0], 6) == 3.994552) and (round(bs2['min'].iloc[0], 3) == 0.215) and \
+           (round(bs2['max'].iloc[0], 1) == 29.0)
 
 
 def test_time_continuity_gaps():

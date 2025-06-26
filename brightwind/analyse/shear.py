@@ -1050,7 +1050,7 @@ class Shear:
                     scaled_wspds[i] = Shear._scale(wspds=by_sector[i]['Unscaled_Wind_Speeds'], height=height,
                                                    shear_to=shear_to,
                                                    calc_method=self.calc_method,
-                                                   roughness=self._roughness[i])
+                                                   roughness=self._roughness.iloc[i])
 
                 if i == 0:
                     result = scaled_wspds[i]
