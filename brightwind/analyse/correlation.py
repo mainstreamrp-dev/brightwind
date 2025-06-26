@@ -220,8 +220,8 @@ class CorrelBase:
         return self.ref_spd, self._ref_spd_col_name, self._ref_spd_col_names, self.ref_dir, self._ref_dir_col_name
 
     def _get_synth_start_dates(self):
-        none_even_freq = ['5H', '7H', '9H', '10H', '11H', '13H', '14H', '15H', '16H', '17H', '18H', '19H',
-                          '20H', '21H', '22H', '23H', 'D', 'W']
+        none_even_freq = ['5h', '7h', '9h', '10h', '11h', '13h', '14h', '15h', '16h', '17h', '18h', '19h',
+                          '20h', '21h', '22h', '23h', 'D', 'W']
         if any(freq in self.averaging_prd for freq in none_even_freq):
             ref_time_array = pd.date_range(start=self.data.index[0], freq='-' + self.averaging_prd,
                                            end=self.ref_spd.index[0])
@@ -323,7 +323,7 @@ class OrdinaryLeastSquares(CorrelBase):
     :param averaging_prd:             Groups data by the time period specified here. The following formats are supported
 
             - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-            - Set period to '1H' for hourly average, '3H' for three hourly average and so on for '4H', '6H' etc.
+            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
             - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
             - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
             - Set period to '1M' for monthly average with the timestamp at the start of the month.
@@ -405,7 +405,7 @@ class OrdinaryLeastSquares(CorrelBase):
 
         # Correlate temperature on an hourly basis using a different aggregation method.
         ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['T2M_degC'], data['T2m'],
-                                                 averaging_prd='1H', coverage_threshold=0,
+                                                 averaging_prd='1h', coverage_threshold=0,
                                                  ref_aggregation_method='min', target_aggregation_method='min')
 
         # Correlate wind speeds on a monthly basis and force the intercept through the origin.
@@ -419,7 +419,7 @@ class OrdinaryLeastSquares(CorrelBase):
 
         # Correlate by directional sector forcing the intercept through the origin.
         ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'],
-                                                 ref_dir=m2_ne['WD50m_deg'], averaging_prd='1H',
+                                                 ref_dir=m2_ne['WD50m_deg'], averaging_prd='1h',
                                                  coverage_threshold=0.9, forced_intercept_origin=True)
     """
     def __init__(self, ref_spd, target_spd, averaging_prd, coverage_threshold=0.9, ref_dir=None, sectors=12,
@@ -462,7 +462,7 @@ class OrdinaryLeastSquares(CorrelBase):
         elif type(self.ref_dir) is pd.Series:
             self.params = []
             for sector, group in pd.concat([self.data, self._ref_dir_bins],
-                                           axis=1, join='inner').dropna().groupby('ref_dir_bin'):
+                                           axis=1, join='inner').dropna().groupby('ref_dir_bin',observed=False):
                 # print('Processing sector:', sector)
                 if len(group) > 1:
                     slope, offset = self._leastsquare(ref_spd=group[self._ref_spd_col_name],
@@ -514,7 +514,7 @@ class OrthogonalLeastSquares(CorrelBase):
     :param averaging_prd:             Groups data by the time period specified here. The following formats are supported
 
             - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-            - Set period to '1H' for hourly average, '3H' for three hourly average and so on for '4H', '6H' etc.
+            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
             - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
             - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
             - Set period to '1M' for monthly average with the timestamp at the start of the month.
@@ -583,7 +583,7 @@ class OrthogonalLeastSquares(CorrelBase):
 
         # Correlate temperature on an hourly basis using a different aggregation method.
         orthog_cor = bw.Correl.OrthogonalLeastSquares(m2_ne['T2M_degC'], data['T2m'],
-                                                      averaging_prd='1H', coverage_threshold=0,
+                                                      averaging_prd='1h', coverage_threshold=0,
                                                       ref_aggregation_method='min', target_aggregation_method='min')
 
     """
@@ -638,7 +638,7 @@ class MultipleLinearRegression(CorrelBase):
     :param averaging_prd:             Groups data by the time period specified here. The following formats are supported
 
             - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-            - Set period to '1H' for hourly average, '3H' for three hourly average and so on for '4H', '6H' etc.
+            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
             - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
             - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
             - Set period to '1M' for monthly average with the timestamp at the start of the month.
@@ -705,7 +705,7 @@ class MultipleLinearRegression(CorrelBase):
 
         # Correlate temperature on an hourly basis using a different aggregation method.
         mul_cor = bw.Correl.MultipleLinearRegression([m2_ne['T2M_degC'], m2_nw['T2M_degC']], data['T2m'],
-                                                     averaging_prd='1H', coverage_threshold=0,
+                                                     averaging_prd='1h', coverage_threshold=0,
                                                      ref_aggregation_method='min', target_aggregation_method='min')
 
     """
@@ -905,7 +905,7 @@ class SpeedSort(CorrelBase):
         :param averaging_prd:       Groups data by the time period specified here. The following formats are supported
 
                 - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-                - Set period to '1H' for hourly average, '3H' for three hourly average and so on for '4H', '6H' etc.
+                - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
                 - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
                 - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
                 - Set period to '1M' for monthly average with the timestamp at the start of the month.
@@ -936,7 +936,7 @@ class SpeedSort(CorrelBase):
 
             # Basic usage on an hourly basis
             ss_cor = bw.Correl.SpeedSort(m2['WS50m_m/s'], m2['WD50m_deg'], data['Spd80mN'], data['Dir78mS'],
-                                         averaging_prd='1H')
+                                         averaging_prd='1h')
             ss_cor.run()
             ss_cor.plot_wind_directions()
             ss_cor.get_result_table()
@@ -944,7 +944,7 @@ class SpeedSort(CorrelBase):
 
             # Sending an array of direction sectors
             ss_cor = bw.Correl.SpeedSort(m2['WS50m_m/s'], m2['WD50m_deg'], data['Spd80mN'], data['Dir78mS'],
-                                         averaging_prd='1H', direction_bin_array=[0,90,130,200,360])
+                                         averaging_prd='1h', direction_bin_array=[0,90,130,200,360])
             ss_cor.run()
 
         """
@@ -1018,7 +1018,7 @@ class SpeedSort(CorrelBase):
         self.params['target_veer_cutoff'] = round(self.target_veer_cutoff, 5)
         self.params['overall_average_veer'] = round(self.overall_veer, 5)
         for sector, group in pd.concat([self.data, self._ref_dir_bins],
-                                       axis=1, join='inner').dropna().groupby('ref_dir_bin'):
+                                       axis=1, join='inner').dropna().groupby('ref_dir_bin',observed=False):
             # print('Processing sector:', sector)
             self.speed_model[sector] = SpeedSort.SectorSpeedModel(ref_spd=group[self._ref_spd_col_name],
                                                                   target_spd=group[self._tar_spd_col_name],
@@ -1210,7 +1210,7 @@ class SpeedSort(CorrelBase):
                                                 direction_bin_array=self.direction_bin_array).rename('ref_dir_bin')],
                       axis=1, join='inner').dropna()
         prediction = pd.Series(dtype='float64').rename('spd')
-        for sector, data in x.groupby('ref_dir_bin'):
+        for sector, data in x.groupby('ref_dir_bin',observed=False):
             if sector in list(self.speed_model.keys()):
                 prediction_spd = self.speed_model[sector].sector_predict(data['spd'])
             else:
