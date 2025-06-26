@@ -277,7 +277,7 @@ def test_synthesize():
 
     for idx, row in pd.DataFrame(result_ord_lst_sq).iterrows():
         # Comparing the first 6 digits to avoid issuing with floating point precision
-        assert str(row[0])[0:6] == str(synth.loc[idx][0])[0:6]
+        assert str(row.iloc[0])[0:6] == str(synth.loc[idx].iloc[0])[0:6]
 
     # Test the synthesise for when the ref_dir is given as input.
     correl = bw.Correl.OrdinaryLeastSquares(MERRA2_NE['WS50m_m/s']['2016-03-02 00:00:00':],
@@ -288,7 +288,7 @@ def test_synthesize():
     synth = correl.synthesize()
 
     for idx, row in pd.DataFrame(result_ord_lst_sq_dir).iterrows():
-        assert str(row[0]) == str(round(synth.loc[idx][0], 6))
+        assert str(row.iloc[0]) == str(round(synth.loc[idx].iloc[0], 6))
 
     # Test the synthesise when SpeedSort correlation is used.
     correl = bw.Correl.SpeedSort(MERRA2_NE['WS50m_m/s']['2016-03-02 00:00:00':'2017-03-02 00:00:00'],
@@ -301,7 +301,7 @@ def test_synthesize():
 
     for idx, row in pd.DataFrame(result_speed_sort).iterrows():
         print(idx)
-        assert str(row[0]) == str(round(synth.loc[idx][0], 6))
+        assert str(row.iloc[0]) == str(round(synth.loc[idx].iloc[0], 6))
 
     # Test the synthesise when SpeedSort correlation is used using 10 min averaging period.
     data_test = DATA_CLND[['Spd80mN', 'Spd60mN', 'Dir78mS', 'Dir58mS']].copy()
