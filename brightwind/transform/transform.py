@@ -52,7 +52,7 @@ def _freq_str_to_dateoffset(period):
         as_dateoffset = pd.DateOffset(weeks=float(period[:-1]))
     elif period[-1:] == 'D':
         as_dateoffset = pd.DateOffset(days=float(period[:-1]))
-    elif period[-1:] == 'H':
+    elif period[-1:] == 'h':
         as_dateoffset = pd.DateOffset(hours=float(period[:-1]))
     elif period[-1:] == 'T':
         as_dateoffset = pd.DateOffset(minutes=float(period[:-1]))
@@ -67,11 +67,11 @@ def _freq_str_to_dateoffset(period):
 
 
 def _convert_days_to_hours(prd):
-    return str(int(prd[:-1])*24)+'H'
+    return str(int(prd[:-1])*24)+'h'
 
 
 def _convert_weeks_to_hours(prd):
-    return str(int(prd[:-1])*24*7)+'H'
+    return str(int(prd[:-1])*24*7)+'h'
 
 
 def _get_min_overlap_timestamp(df1_timestamps, df2_timestamps):
@@ -170,7 +170,7 @@ def _round_timestamp_down_to_averaging_prd(timestamp, period):
 
     :param timestamp: Timestamp to round down from.
     :type timestamp:  pd.Timestamp
-    :param period:    Averaging period e.g. '10min', '1H', '3H', '6H', '1D', '7D', '1W', '1MS', '1AS'
+    :param period:    Averaging period e.g. '10min', '1h', '3h', '6h', '1D', '7D', '1W', '1MS', '1AS'
     :type period:     str
     :return:          Timestamp to represent the start of an averaging period which covers the timestamp.
     :rtype:           str
@@ -189,7 +189,7 @@ def _round_timestamp_down_to_averaging_prd(timestamp, period):
                                                                 day=timestamp.day, hour=timestamp.hour,
                                                                 minute=_round_down_to_multiple(timestamp.minute,
                                                                                                int(period[:-3])))
-    elif period[-1] == 'H':
+    elif period[-1] == 'h':
         return '{year}-{month}-{day} {hour}:00:00'.format(year=timestamp.year, month=timestamp.month, day=timestamp.day,
                                                           hour=_round_down_to_multiple(timestamp.hour,
                                                                                        int(period[:-1])))
@@ -333,7 +333,7 @@ def average_data_by_period(data, period, wdir_column_names=None, aggregation_met
     :param period:             Groups data by the period specified here. The following formats are supported
 
             - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-            - Set period to '1H' for hourly average, '3H' for three hourly average and so on for '4H', '6H' etc.
+            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
             - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
             - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
             - Set period to '1M' for monthly average with the timestamp at the start of the month.
@@ -372,7 +372,7 @@ def average_data_by_period(data, period, wdir_column_names=None, aggregation_met
         data = bw.load_csv(bw.demo_datasets.demo_data)
 
         # To find hourly averages
-        data_hourly = bw.average_data_by_period(data.Spd80mN, period='1H')
+        data_hourly = bw.average_data_by_period(data.Spd80mN, period='1h')
 
         # To find monthly averages
         data_monthly = bw.average_data_by_period(data.Spd80mN, period='1M')
@@ -412,8 +412,7 @@ def average_data_by_period(data, period, wdir_column_names=None, aggregation_met
             raise ValueError("The time period specified is less than the temporal resolution of the data. "
                              "For example, hourly data should not be averaged to 10 minute data.")
     data = data.sort_index()
-    grouper_obj = data.resample(period, axis=0, closed='left', label='left',
-                                convention='start', kind='timestamp')
+    grouper_obj = data.resample(period, closed='left', label='left')
 
     # if period is equal to data resolution then no need to vector average wind direction
     is_period_not_equal_to_resolution = (_freq_str_to_dateoffset(period) != _get_data_resolution(data.index))
@@ -538,7 +537,7 @@ def _vector_avg_of_wdirs_dataframe(wdirs, wspds=None):
     # means there is no wind direction => return NaN
     nan_mask = (avg_dir_df['sine'] == 0) & (avg_dir_df['cosine'] == 0)
     avg_dir_df['avg_dir'] = np.rad2deg(np.arctan2(sine, cosine)) % 360
-    avg_dir_df['avg_dir'][nan_mask] = np.nan
+    avg_dir_df.loc[nan_mask,'avg_dir'] = np.nan
     return avg_dir_df['avg_dir']
 
 
@@ -701,7 +700,7 @@ def merge_datasets_by_period(data_1, data_2, period,
     :param period: Groups data by the time period specified here. The following formats are supported
 
             - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-            - Set period to '1H' for hourly average, '3H' for three hourly average and so on for '4H', '6H' etc.
+            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
             - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
             - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
             - Set period to '1M' for monthly average with the timestamp at the start of the month.
@@ -1018,7 +1017,7 @@ def offset_wind_direction(wdir, offset: float):
     if isinstance(wdir, float) or isinstance(wdir, int):
         return utils._range_0_to_360(wdir + offset)
     elif isinstance(wdir, pd.DataFrame):
-        return wdir.add(offset).applymap(utils._range_0_to_360)
+        return wdir.add(offset).map(utils._range_0_to_360)
     elif isinstance(wdir, pd.Series):
         return wdir.add(offset).apply(utils._range_0_to_360)
 
@@ -1313,7 +1312,7 @@ def offset_timestamps(data, offset, date_from=None, date_to=None, overwrite=Fals
         data = bw.load_csv(bw.demo_datasets.demo_data)
 
         # To decrease 10 minutes within a given date range and overwrite the original data
-        op1 = bw.offset_timestamps(data, offset='1H', date_from='2016-02-01 00:20:00',
+        op1 = bw.offset_timestamps(data, offset='1h', date_from='2016-02-01 00:20:00',
             date_to='2016-02-01 01:40:00', overwrite=True)
 
         # To decrease 10 minutes within a given date range not overwriting the original data
@@ -1331,13 +1330,13 @@ def offset_timestamps(data, offset, date_from=None, date_to=None, overwrite=Fals
             date_to='2016-02-01 01:40:00')
 
         # Can also except decimal values for offset, like 3.5H for 3 hours and 30 minutes
-        op5 = bw.offset_timestamps(data.index, offset='3.5H', date_from='2016-02-01 00:20:00',
+        op5 = bw.offset_timestamps(data.index, offset='3.5h', date_from='2016-02-01 00:20:00',
             date_to='2016-02-01 01:40:00')
 
         # Can accept also Timestamp and datetime objects
-        bw.offset_timestamps(data.index[0], offset='4H')
-        bw.offset_timestamps(datetime.datetime(2016, 2, 1, 0, 20), offset='3.5H')
-        bw.offset_timestamps(datetime.date(2016, 2, 1), offset='-5H')
+        bw.offset_timestamps(data.index[0], offset='4h')
+        bw.offset_timestamps(datetime.datetime(2016, 2, 1, 0, 20), offset='3.5h')
+        bw.offset_timestamps(datetime.date(2016, 2, 1), offset='-5h')
         bw.offset_timestamps(datetime.time(0, 20), offset='30min')
 
     """

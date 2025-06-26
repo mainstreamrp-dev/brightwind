@@ -1480,10 +1480,10 @@ def coverage(data, period='1M', aggregation_method='mean', data_resolution=None)
         data = bw.load_campbell_scientific(bw.demo_datasets.demo_campbell_scientific_site_data)
 
         #To find hourly coverage
-        data_hourly = bw.coverage(data.Spd80mN, period='1H')
+        data_hourly = bw.coverage(data.Spd80mN, period='1h')
 
         #To find hourly coverage for multiple columns
-        data_hourly_multiple = bw.coverage(data[['Spd80mS','Spd60mN']], period='1H')
+        data_hourly_multiple = bw.coverage(data[['Spd80mS','Spd60mN']], period='1h')
 
         #To find monthly_coverage
         data_monthly = bw.coverage(data.Spd80mN, period='1M')

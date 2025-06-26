@@ -203,9 +203,9 @@ def test_ti_twelve_by_24():
 
 def test_coverage():
     # hourly coverage
-    assert round(bw.coverage(DATA[['Spd80mN']], period='1H')[
+    assert round(bw.coverage(DATA[['Spd80mN']], period='1h')[
            '2016-01-09 17:00':'2016-01-09 17:30'].values[0][0], 5) == 0.83333
-    assert round(bw.coverage(DATA.Spd80mN, period='1H')[
+    assert round(bw.coverage(DATA.Spd80mN, period='1h')[
            '2016-01-09 17:00':'2016-01-09 17:30'].values[0], 5) == 0.83333
     # monthly_coverage
     assert round(bw.coverage(DATA.Spd80mN, period='1M')['2016-05-01'], 5) == 0.36537

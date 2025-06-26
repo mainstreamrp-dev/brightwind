@@ -2352,7 +2352,7 @@ def plot_shear_time_of_day(df, calc_method, plot_type='step'):
         ax.set_ylabel(label)
 
         # create x values for plot
-        idx = pd.date_range('2017-01-01 00:00', '2017-01-01 23:00', freq='1H').hour
+        idx = pd.date_range('2017-01-01 00:00', '2017-01-01 23:00', freq='1h').hour
 
         if plot_type == 'step':
             df = df.shift(+1, axis=0)

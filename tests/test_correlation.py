@@ -102,7 +102,7 @@ def test_ordinary_least_squares():
     assert round(correl.params['num_data_points'], 5) == correl_monthly_results_90_intercept['num_data_points']
 
     # check hourly, checked against Excel
-    correl = bw.Correl.OrdinaryLeastSquares(MERRA2_NE['WS50m_m/s'], DATA_CLND['Spd80mN'], averaging_prd='1H',
+    correl = bw.Correl.OrdinaryLeastSquares(MERRA2_NE['WS50m_m/s'], DATA_CLND['Spd80mN'], averaging_prd='1h',
                                             coverage_threshold=1)
     correl.run()
     assert round(correl.params['slope'], 5) == correl_hourly_results['slope']
@@ -113,7 +113,7 @@ def test_ordinary_least_squares():
     # check aggregation method
     correl_aggregation_results = {'slope': 5.98789, 'offset': -9.32585, 'r2': 0.9304, 'num_data_points': 12445}
     correl = bw.Correl.OrdinaryLeastSquares(MERRA2_NE['T2M_degC'], DATA_CLND['T2m'],
-                                            averaging_prd='1H', coverage_threshold=1,
+                                            averaging_prd='1h', coverage_threshold=1,
                                             ref_aggregation_method='sum', target_aggregation_method='sum')
     correl.run()
     correl.plot()
@@ -370,7 +370,7 @@ def test_orthogonal_least_squares():
     assert round(correl.params['num_data_points'], 5) == correl_monthly_results['num_data_points']
 
     # check hourly
-    correl = bw.Correl.OrthogonalLeastSquares(MERRA2_NE['WS50m_m/s'], DATA_CLND['Spd80mN'], averaging_prd='1H',
+    correl = bw.Correl.OrthogonalLeastSquares(MERRA2_NE['WS50m_m/s'], DATA_CLND['Spd80mN'], averaging_prd='1h',
                                               coverage_threshold=1)
     correl.run()
     assert round(correl.params['slope'], 5) == correl_hourly_results['slope']
@@ -381,7 +381,7 @@ def test_orthogonal_least_squares():
     # check aggregation method
     correl_aggregation_results = {'slope': 6.42434, 'offset': -12.8301, 'r2': 0.9255, 'num_data_points': 12445}
     correl = bw.Correl.OrthogonalLeastSquares(MERRA2_NE['T2M_degC'], DATA_CLND['T2m'],
-                                              averaging_prd='1H', coverage_threshold=1,
+                                              averaging_prd='1h', coverage_threshold=1,
                                               ref_aggregation_method='sum', target_aggregation_method='sum')
     correl.run()
     assert round(correl.params['slope'], 5) == correl_aggregation_results['slope']
@@ -403,7 +403,7 @@ def test_multiple_linear_regression():
     # check aggregation method
     correl_aggregation_results = {'slope': [5.51666, 0.54769], 'offset': -10.44818, 'num_data_pts': 12445}
     correl = bw.Correl.MultipleLinearRegression([MERRA2_NE['T2M_degC'], MERRA2_NW['T2M_degC']], DATA_CLND['T2m'],
-                                                averaging_prd='1H', coverage_threshold=1,
+                                                averaging_prd='1h', coverage_threshold=1,
                                                 ref_aggregation_method='sum', target_aggregation_method='sum')
     correl.run()
     for idx, slope in enumerate(correl.params['slope']):
@@ -570,7 +570,7 @@ def test_speed_sort():
     }
     ss_cor = bw.Correl.SpeedSort(MERRA2_NE['WS50m_m/s'], MERRA2_NE['WD50m_deg'],
                                  DATA_CLND['Spd80mN'], DATA_CLND['Dir78mS'],
-                                 averaging_prd='1H')
+                                 averaging_prd='1h')
     ss_cor.run()
 
     assert ss_cor.params['overall_average_veer'] == result['overall_average_veer']

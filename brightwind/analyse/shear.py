@@ -264,7 +264,7 @@ class Shear:
                 raise ValueError("'segments_per_day' must be a divisor of 24.")
 
             segment_start_time = str(segment_start_time)
-            start_times[0] = datetime.datetime.strptime(segment_start_time, '%H')
+            start_times[0] = datetime.datetime.strptime(segment_start_time, '%h')
             dt = datetime.timedelta(hours=interval)
 
             # extract wind speeds for each daily segment
@@ -1093,7 +1093,7 @@ class Shear:
         df_copy = data.copy()
         interval = int(24 / len(data))
         # set index for new data frame to deal with less than 24 sectors
-        idx = pd.date_range('2017-01-01 00:00', '2017-01-01 23:00', freq='1H')
+        idx = pd.date_range('2017-01-01 00:00', '2017-01-01 23:00', freq='1h')
 
         # create new dataframe with 24 rows only interval number of unique values
         df = pd.DataFrame({cols: [np.nan] for cols in df_copy.columns}, index=pd.DatetimeIndex(idx).time)
@@ -1130,7 +1130,7 @@ class Shear:
         Shear._valid_wsp_data_error_msg(wspds, min_speed)
         if isinstance(wspds.index, pd.DatetimeIndex):
             if maximise_data is False:
-                cvg = coverage(wspds[wspds > min_speed].dropna(), period='1AS').sum()[1]
+                cvg = coverage(wspds[wspds > min_speed].dropna(), period='1AS').sum().iloc[1]
             else:
                 _wspds = wspds[wspds > min_speed]
                 count = _wspds.count(axis=1)
