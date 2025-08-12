@@ -12,6 +12,9 @@ from brightwind.transform.transform import offset_wind_direction
 from brightwind.utils import utils
 import pprint
 import warnings
+from sklearn.neural_network import MLPRegressor
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 __all__ = ['']
 
@@ -33,9 +36,11 @@ class CorrelBase:
         # Get the name of the columns so they can be passed around
         self._ref_spd_col_name = ref_spd.name if ref_spd is not None and isinstance(ref_spd, pd.Series) else None
         self._ref_spd_col_names = ref_spd.columns if ref_spd is not None and isinstance(ref_spd, pd.DataFrame) else None
-        self._ref_dir_col_name = ref_dir.name if ref_dir is not None else None
-        self._tar_spd_col_name = target_spd.name if target_spd is not None else None
-        self._tar_dir_col_name = target_dir.name if target_dir is not None else None
+        self._ref_dir_col_name = ref_dir.name if ref_dir is not None and isinstance(ref_dir, pd.Series) else None
+        self._tar_spd_col_name = target_spd.name if target_spd is not None and isinstance(ref_spd, pd.Series) else None
+        self._tar_dir_col_name = target_dir.name if target_dir is not None and isinstance(ref_spd, pd.Series) else None
+        self._tar_spd_col_names = target_spd.columns if target_spd is not None and isinstance(target_spd, pd.DataFrame) else None
+
 
         # Rename speed and direction reference column name(s) if any equal to target column name
         self.ref_spd, self._ref_spd_col_name, self._ref_spd_col_names, self.ref_dir, self._ref_dir_col_name = \
@@ -206,7 +211,7 @@ class CorrelBase:
             self.ref_spd = self.ref_spd.rename(self._ref_spd_col_name)
         elif isinstance(self.ref_spd, pd.DataFrame) and self._ref_spd_col_names is not None:
             self._ref_spd_col_names = self._rename_equal_elements_between_two_inputs(list(self._ref_spd_col_names),
-                                                                                     self._tar_spd_col_name,
+                                                                                     list(self._tar_spd_col_names),
                                                                                      input1_suffix='_ref')
             self.ref_spd.columns = self._ref_spd_col_names
 
@@ -302,6 +307,8 @@ class CorrelBase:
 
         if isinstance(output, pd.Series):
             return output.to_frame(name=self.target_spd.name + "_Synthesized")
+        elif isinstance(output, pd.DataFrame):
+            return output.add_suffix("_Synthesized")
         else:
             output.columns = [self.target_spd.name + "_Synthesized"]
             return output
@@ -499,6 +506,170 @@ class OrdinaryLeastSquares(CorrelBase):
         if offset is None:
             offset = self.params['offset']
         return ref_spd * slope + offset
+
+
+class MultiLayerPerceptron(CorrelBase):
+    """
+    Correlate two datasets against each other using the Ordinary Least Squares method. This accepts two wind speed
+    Series with timestamps as indexes and an averaging period which merges the datasets by this time period before
+    performing the correlation.
+
+    :param ref_spd:                   Series containing reference wind speed as a column, timestamp as the index.
+    :type ref_spd:                    pd.Series
+    :param target_spd:                Series containing target wind speed as a column, timestamp as the index.
+    :type target_spd:                 pd.Series
+    :param averaging_prd:             Groups data by the time period specified here. The following formats are supported
+
+            - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
+            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
+            - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
+            - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
+            - Set period to '1M' for monthly average with the timestamp at the start of the month.
+            - Set period to '1A' for annual average with the timestamp at the start of the year.
+
+    :type averaging_prd:              str
+    :param coverage_threshold:        Minimum coverage required when aggregating the data to the averaging_prd.
+    :type coverage_threshold:         float
+    :param ref_dir:                   Series containing reference wind direction as a column, timestamp as the index.
+    :type ref_dir:                    pd.Series
+    :param sectors:                   Number of direction sectors to bin in to. The first sector is centered at 0 by
+                                      default. To change that behaviour specify 'direction_bin_array' which overwrites
+                                      'sectors'.
+    :type sectors:                    int
+    :param direction_bin_array:       An optional parameter where if you want custom direction bins, pass an array
+                                      of the bins. To add custom bins for direction sectors, overwrites sectors. For
+                                      instance, for direction bins [0,120), [120, 215), [215, 360) the list would
+                                      be [0, 120, 215, 360]
+    :type direction_bin_array:        List()
+    :param ref_aggregation_method:    Default `mean`, returns the mean of the data for the specified period. Can also
+                                      use `median`, `prod`, `sum`, `std`,`var`, `max`, `min` which are shorthands for
+                                      median, product, summation, standard deviation, variance, maximum and minimum
+                                      respectively.
+    :type ref_aggregation_method:     str
+    :param target_aggregation_method: Default `mean`, returns the mean of the data for the specified period. Can also
+                                      use `median`, `prod`, `sum`, `std`,`var`, `max`, `min` which are shorthands for
+                                      median, product, summation, standard deviation, variance, maximum and minimum
+                                      respectively.
+    :type target_aggregation_method:  str
+    :param forced_intercept_origin:   Default False; if set to True will force the regression to pass through [0; 0]
+    :type forced_intercept_origin:    boolean
+    :returns:                         An object representing ordinary least squares fit model
+
+    **Example usage**
+    ::
+        import brightwind as bw
+        data = bw.load_csv(bw.demo_datasets.demo_data)
+        m2_ne = bw.load_csv(bw.demo_datasets.demo_merra2_NE)
+        m2_nw = bw.load_csv(bw.demo_datasets.demo_merra2_NW)
+
+        # Correlate wind speeds on a monthly basis.
+        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'], averaging_prd='1M',
+                                                 coverage_threshold=0.95)
+        ols_cor.run()
+
+        # To plot the scatter plot and regression line.
+        ols_cor.plot()
+
+        # To change the plot's size.
+        ols_cor.plot(figure_size=(12,15))
+
+        # To show the resulting parameters.
+        ols_cor.params
+        # or
+        ols_cor.show_params()
+
+        # To synthesize data at the target site.
+        ols_cor.synthesize()
+
+        # To synthesize data at the target site using a different external reference dataset.
+        ols_cor.synthesize(ext_input=m2_nw['WS50m_m/s'])
+
+        # To run the correlation without immediately showing results.
+        ols_cor.run(show_params=False)
+
+        # To retrieve the merged and aggregated data used in the correlation.
+        ols_cor.data
+
+        # To retrieve the number of data points used for the correlation
+        ols_cor.num_data_pts
+
+        # To retrieve the input parameters.
+        ols_cor.averaging_prd
+        ols_cor.coverage_threshold
+        ols_cor.ref_spd
+        ols_cor.ref_aggregation_method
+        ols_cor.target_spd
+        ols_cor.target_aggregation_method
+
+        # Correlate temperature on an hourly basis using a different aggregation method.
+        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['T2M_degC'], data['T2m'],
+                                                 averaging_prd='1h', coverage_threshold=0,
+                                                 ref_aggregation_method='min', target_aggregation_method='min')
+
+        # Correlate wind speeds on a monthly basis and force the intercept through the origin.
+        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'], averaging_prd='1M',
+                                                 coverage_threshold=0.95, forced_intercept_origin=True)
+
+        # Correlate by directional sector, using 36 sectors.
+        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'],
+                                                ref_dir=m2_ne['WD50m_deg'], averaging_prd='1D',
+                                                coverage_threshold=0.9, sectors=36)
+
+        # Correlate by directional sector forcing the intercept through the origin.
+        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'],
+                                                 ref_dir=m2_ne['WD50m_deg'], averaging_prd='1h',
+                                                 coverage_threshold=0.9, forced_intercept_origin=True)
+    """
+    def __init__(self, ref_spd, target_spd, averaging_prd, ref_aggregation_method='mean', target_aggregation_method='mean'):
+        CorrelBase.__init__(self, ref_spd, target_spd, averaging_prd, 
+                            ref_aggregation_method=ref_aggregation_method,
+                            target_aggregation_method=target_aggregation_method
+                            )
+
+    def __repr__(self):
+        return 'Multi-layer Perceptron ' + str(self.params)
+
+    @staticmethod
+    def _leastsquare(ref_spd, target_spd, forced_intercept_origin=False):
+        if forced_intercept_origin:
+            x = np.nan_to_num(ref_spd.values.flatten()[:, np.newaxis])
+            y = np.nan_to_num(target_spd.values.flatten())
+            p, res = lstsq(x, y)[0:2]
+            return p[0], 0
+        elif not forced_intercept_origin:
+            p, res = lstsq(np.nan_to_num(ref_spd.values.flatten()[:, np.newaxis] ** [1, 0]),
+                           np.nan_to_num(target_spd.values.flatten()))[0:2]
+            return p[0], p[1]
+
+    def run(self, show_params=True):
+        model = make_pipeline(
+            StandardScaler(),
+            MLPRegressor(
+                loss='squared_error',
+                hidden_layer_sizes = (100,),
+                activation='relu',
+                solver='adam',
+                alpha=1E-0,
+                max_iter=1000
+                ),
+                )
+        return model.fit(self.data[self._ref_spd_col_names], self.data[self._tar_spd_col_names])
+
+    def _predict(self, ref_spd):
+        model = make_pipeline(
+            StandardScaler(),
+            MLPRegressor(
+                loss='squared_error',
+                hidden_layer_sizes = (100,),
+                activation='relu',
+                solver='adam',
+                alpha=1E-0,
+                max_iter=1000
+                ),
+                )
+        model.fit(self.data[self._ref_spd_col_names], self.data[self._tar_spd_col_names])
+        return pd.DataFrame(data=model.predict(ref_spd), index=self.ref_spd.index, columns=self._tar_spd_col_names)
+
 
 
 class OrthogonalLeastSquares(CorrelBase):
