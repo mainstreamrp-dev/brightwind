@@ -19,6 +19,21 @@ from sklearn.preprocessing import StandardScaler
 __all__ = ['']
 
 
+def _get_radians(timestamps: pd.DatetimeIndex, period):
+    _NanosecondsInDay = 24 * 3600 * 10**9
+    _NanosecondsInYear = 365.2425 * _NanosecondsInDay
+    if period == 'day':
+        return 2 * np.pi * np.mod(timestamps.astype(np.int64) / _NanosecondsInDay, 1.0)
+    if period == 'year':
+        return 2 * np.pi * np.mod(timestamps.astype(np.int64) / _NanosecondsInYear, 1.0)
+
+
+def get_time_comps(data, period):
+    _NanosecondsInDay = 24 * 3600 * 10**9
+    _NanosecondsInYear = 365.2425 * _NanosecondsInDay
+    data_radians = _get_radians(data, period)
+    return np.cos(data_radians), np.sin(data_radians)
+
 class CorrelBase:
     def __init__(self, ref_spd, target_spd, averaging_prd, coverage_threshold=None, ref_dir=None, target_dir=None,
                  sectors=12, direction_bin_array=None, ref_aggregation_method='mean', target_aggregation_method='mean',
@@ -620,56 +635,99 @@ class MultiLayerPerceptron(CorrelBase):
                                                  ref_dir=m2_ne['WD50m_deg'], averaging_prd='1h',
                                                  coverage_threshold=0.9, forced_intercept_origin=True)
     """
-    def __init__(self, ref_spd, target_spd, averaging_prd, ref_aggregation_method='mean', target_aggregation_method='mean'):
+    def __init__(self, ref_spd, target_spd, averaging_prd, 
+                 ref_spd_col, tar_spd_col, ref_dir_col, tar_dir_col, 
+                 ref_aggregation_method='mean', target_aggregation_method='mean',
+                 loss='squared_error', hidden_layer_sizes=(100,), activation='relu', solver='adam', alpha=1E-0, max_iter=1000,
+                 ):
+
+        self.loss=loss
+        self.hidden_layer_sizes=hidden_layer_sizes
+        self.activation=activation
+        self.solver=solver
+        self.alpha=alpha
+        self.max_iter=max_iter
+        self.ref_spd_col=ref_spd_col
+        self.tar_spd_col=tar_spd_col
+        self.ref_dir_col=ref_dir_col
+        self.tar_dir_col=tar_dir_col
+
+        self.ref_spd, self.target_spd = self.prepare(ref_spd, target_spd)
+
         CorrelBase.__init__(self, ref_spd, target_spd, averaging_prd, 
                             ref_aggregation_method=ref_aggregation_method,
                             target_aggregation_method=target_aggregation_method
                             )
+        
+        self._ref_spd_fit_col_names = list(self._ref_spd_col_names.copy()) #first we copy the list so we can edit without causing issues
+        self._ref_spd_fit_col_names.remove(self.ref_spd_col)
+        self._ref_spd_fit_col_names.remove(self.ref_dir_col)
+        self._tar_spd_fit_col_names = list(self._tar_spd_col_names.copy()) #first we copy the list so we can edit without causing issues
+        self._tar_spd_fit_col_names.remove(self.tar_spd_col)
+        self._tar_spd_fit_col_names.remove(self.tar_dir_col)
+
 
     def __repr__(self):
         return 'Multi-layer Perceptron ' + str(self.params)
+    
+    def prepare(self, ref_spd, target_spd):
+        #prepare ref_spd data        
+        #go from polar to cartesian
+        ref_spd['cos_u'] = np.cos(np.deg2rad(ref_spd[self.ref_dir_col])) * ref_spd[self.ref_spd_col]
+        ref_spd['sin_u'] = np.sin(np.deg2rad(ref_spd[self.ref_dir_col])) * ref_spd[self.ref_spd_col]
+        #then conver hour and month to polar domain, to facilitate ML training (as months and hours are cyclical)
+        year_cos, year_sin = get_time_comps(ref_spd.index, 'year')
+        ref_spd['time_of_year_cos'] = year_cos
+        ref_spd['time_of_year_sin'] = year_sin
+        day_cos, day_sin = get_time_comps(ref_spd.index, 'day')
+        ref_spd['time_of_day_cos'] = day_cos
+        ref_spd['time_of_day_sin'] = day_sin
 
-    @staticmethod
-    def _leastsquare(ref_spd, target_spd, forced_intercept_origin=False):
-        if forced_intercept_origin:
-            x = np.nan_to_num(ref_spd.values.flatten()[:, np.newaxis])
-            y = np.nan_to_num(target_spd.values.flatten())
-            p, res = lstsq(x, y)[0:2]
-            return p[0], 0
-        elif not forced_intercept_origin:
-            p, res = lstsq(np.nan_to_num(ref_spd.values.flatten()[:, np.newaxis] ** [1, 0]),
-                           np.nan_to_num(target_spd.values.flatten()))[0:2]
-            return p[0], p[1]
+        #prepare target_spd data 
+        target_spd['o_cos_u'] =  np.cos(np.deg2rad(target_spd[self.tar_dir_col])) * target_spd[self.tar_spd_col]
+        target_spd['o_sin_u'] =  np.sin(np.deg2rad(target_spd[self.tar_dir_col])) * target_spd[self.tar_spd_col]
+        return ref_spd, target_spd
 
-    def run(self, show_params=True):
+            
+    def model(self):
         model = make_pipeline(
             StandardScaler(),
             MLPRegressor(
-                loss='squared_error',
-                hidden_layer_sizes = (100,),
-                activation='relu',
-                solver='adam',
-                alpha=1E-0,
-                max_iter=1000
+                loss=self.loss,
+                hidden_layer_sizes=self.hidden_layer_sizes,
+                activation=self.activation,
+                solver=self.solver,
+                alpha=self.alpha,
+                max_iter=self.max_iter
                 ),
                 )
-        return model.fit(self.data[self._ref_spd_col_names], self.data[self._tar_spd_col_names])
+        return model
 
-    def _predict(self, ref_spd):
-        model = make_pipeline(
-            StandardScaler(),
-            MLPRegressor(
-                loss='squared_error',
-                hidden_layer_sizes = (100,),
-                activation='relu',
-                solver='adam',
-                alpha=1E-0,
-                max_iter=1000
-                ),
-                )
-        model.fit(self.data[self._ref_spd_col_names], self.data[self._tar_spd_col_names])
-        return pd.DataFrame(data=model.predict(ref_spd), index=self.ref_spd.index, columns=self._tar_spd_col_names)
+    def run(self):
+        model = self.model()
+        return model.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
 
+    def _predict(self, ref_spd, enable_eqm=True):
+        model = self.model()
+        model.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
+
+        #post processing
+        predicted = pd.DataFrame(data=model.predict(ref_spd), index=self.ref_spd.index, columns=['o_cos_u_Synthesized', 'o_sin_u_Synthesized'])
+        predicted[self.tar_spd_col] = np.sqrt(predicted['o_cos_u_Synthesized']**2 + predicted['o_sin_u_Synthesized']**2)
+        predicted[self.tar_dir_col] = np.mod(np.rad2deg(np.arctan2(predicted['o_sin_u_Synthesized'], predicted['o_cos_u_Synthesized'])),360)
+
+        if enable_eqm == False:
+            return predicted[[self.tar_spd_col, self.tar_dir_col]]
+        elif enable_eqm == True:
+            return predicted[[self.tar_spd_col, self.tar_dir_col]]
+
+    #def eqm(self):
+        #obsh = observation for the historical period
+        #simh = simulation for the historical period
+        #simp = observation for the future period
+        #obsh = onsite_data_eqm.to_xarray()
+        #simh = y_predict_train_eqm.rename(columns={o_wsnode+'_Predicted': o_wsnode, o_wdnode+'_Predicted': o_wdnode}).to_xarray()
+        #simp = WS_lt_eqm.to_xarray()
 
 
 class OrthogonalLeastSquares(CorrelBase):
