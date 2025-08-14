@@ -15,6 +15,7 @@ import warnings
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from cmethods import adjust
 
 __all__ = ['']
 
@@ -666,6 +667,9 @@ class MultiLayerPerceptron(CorrelBase):
         self._tar_spd_fit_col_names.remove(self.tar_spd_col)
         self._tar_spd_fit_col_names.remove(self.tar_dir_col)
 
+        self.model_ = None  # will hold the fitted pipeline
+
+
 
     def __repr__(self):
         return 'Multi-layer Perceptron ' + str(self.params)
@@ -690,7 +694,7 @@ class MultiLayerPerceptron(CorrelBase):
 
             
     def model(self):
-        model = make_pipeline(
+        return make_pipeline(
             StandardScaler(),
             MLPRegressor(
                 loss=self.loss,
@@ -701,33 +705,70 @@ class MultiLayerPerceptron(CorrelBase):
                 max_iter=self.max_iter
                 ),
                 )
-        return model
 
     def run(self):
-        model = self.model()
-        return model.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
+        if self.model_ is None:
+            self.model_ = self.model()
+        self.model_.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
 
     def _predict(self, ref_spd, enable_eqm=True):
-        model = self.model()
-        model.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
+        if self.model_ is None:
+            raise RuntimeError("Model is not fitted. Call run() first.")
 
         #post processing
-        predicted = pd.DataFrame(data=model.predict(ref_spd), index=self.ref_spd.index, columns=['o_cos_u_Synthesized', 'o_sin_u_Synthesized'])
+        predicted = pd.DataFrame(data=self.model_.predict(ref_spd), index=self.ref_spd.index, columns=['o_cos_u_Synthesized', 'o_sin_u_Synthesized'])
         predicted[self.tar_spd_col] = np.sqrt(predicted['o_cos_u_Synthesized']**2 + predicted['o_sin_u_Synthesized']**2)
         predicted[self.tar_dir_col] = np.mod(np.rad2deg(np.arctan2(predicted['o_sin_u_Synthesized'], predicted['o_cos_u_Synthesized'])),360)
+        
+        self.predicted = predicted[[self.tar_spd_col, self.tar_dir_col]]
 
         if enable_eqm == False:
             return predicted[[self.tar_spd_col, self.tar_dir_col]]
         elif enable_eqm == True:
             return predicted[[self.tar_spd_col, self.tar_dir_col]]
 
-    #def eqm(self):
+    def eqm(self, variable="Wind Speed"):
         #obsh = observation for the historical period
         #simh = simulation for the historical period
         #simp = observation for the future period
-        #obsh = onsite_data_eqm.to_xarray()
-        #simh = y_predict_train_eqm.rename(columns={o_wsnode+'_Predicted': o_wsnode, o_wdnode+'_Predicted': o_wdnode}).to_xarray()
-        #simp = WS_lt_eqm.to_xarray()
+
+        #format inputs
+        if variable == "Wind Speed":
+            variable_col = self.tar_spd_col
+        elif variable == "Wind Direction":
+            variable_col = self.tar_dir_col
+
+        obsh_df = self.data[[variable_col]]
+        obsh_df.index.names = ['time1']
+        obsh_df.index = obsh_df.index.tz_localize(None)
+        obsh = obsh_df.to_xarray()
+
+        #we define the start and end of "historical" period
+        start_h = self.data[[variable_col]].index.min()
+        end_h  = self.data[[variable_col]].index.max()
+
+        simh_df = self.predicted.loc[start_h:end_h,[variable_col]] #for historical period only
+        simh_df.index.names = ['time2']
+        simh_df.index = simh_df.index.tz_localize(None)
+        simh = simh_df.to_xarray()
+
+        simp_df = self.predicted[[variable_col]] #for whole period
+        simp_df.index.names = ['time3']
+        simp_df.index = simp_df.index.tz_localize(None)
+        simp = simp_df.to_xarray()
+
+        self.predicted_eqm = adjust(method="quantile_mapping",
+                               obs=obsh[variable_col],
+                               simh=simh[variable_col],
+                               simp=simp[variable_col],
+                               input_core_dims={"obs": "time1", "simh": "time2", "simp": "time3"},
+                               n_quantiles=60,
+                               kind="+"
+                               ).to_dataframe()
+
+        #postprocessing back to normal
+        #self.predicted_eqm.index = self.predicted_eqm.index.tz_localize(time_zone_site)
+        self.predicted_eqm.index.name = self.data.index.name
 
 
 class OrthogonalLeastSquares(CorrelBase):
