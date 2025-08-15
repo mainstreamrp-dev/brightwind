@@ -711,7 +711,7 @@ class MultiLayerPerceptron(CorrelBase):
             self.model_ = self.model()
         self.model_.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
 
-    def _predict(self, ref_spd, enable_eqm=True):
+    def _predict(self, ref_spd):
         if self.model_ is None:
             raise RuntimeError("Model is not fitted. Call run() first.")
 
@@ -722,10 +722,10 @@ class MultiLayerPerceptron(CorrelBase):
         
         self.predicted = predicted[[self.tar_spd_col, self.tar_dir_col]]
 
-        if enable_eqm == False:
-            return predicted[[self.tar_spd_col, self.tar_dir_col]]
-        elif enable_eqm == True:
-            return predicted[[self.tar_spd_col, self.tar_dir_col]]
+        predicted_eqm_ws = self.eqm(variable="Wind Speed")
+        predicted_eqm_wd = self.eqm(variable="Wind Direction")
+        predicted_eqm = predicted_eqm_ws.merge(predicted_eqm_wd, left_index=True, right_index=True)
+        return predicted_eqm
 
     def eqm(self, variable="Wind Speed"):
         #obsh = observation for the historical period
@@ -737,10 +737,13 @@ class MultiLayerPerceptron(CorrelBase):
             variable_col = self.tar_spd_col
         elif variable == "Wind Direction":
             variable_col = self.tar_dir_col
+        else:
+            print("Error - variables can only be 'Wind Speed' or 'Wind Direction'")
 
         obsh_df = self.data[[variable_col]]
         obsh_df.index.names = ['time1']
-        obsh_df.index = obsh_df.index.tz_localize(None)
+        if obsh_df.index.tz:
+            obsh_df.index = obsh_df.index.tz_localize(None)
         obsh = obsh_df.to_xarray()
 
         #we define the start and end of "historical" period
@@ -749,15 +752,18 @@ class MultiLayerPerceptron(CorrelBase):
 
         simh_df = self.predicted.loc[start_h:end_h,[variable_col]] #for historical period only
         simh_df.index.names = ['time2']
-        simh_df.index = simh_df.index.tz_localize(None)
+        if simh_df.index.tz:
+            simh_df.index = simh_df.index.tz_localize(None)
         simh = simh_df.to_xarray()
 
         simp_df = self.predicted[[variable_col]] #for whole period
         simp_df.index.names = ['time3']
-        simp_df.index = simp_df.index.tz_localize(None)
+        if simp_df.index.tz:
+            sim_tz = str(simp_df.index.tz)
+            simp_df.index = simp_df.index.tz_localize(None)
         simp = simp_df.to_xarray()
 
-        self.predicted_eqm = adjust(method="quantile_mapping",
+        predicted_eqm = adjust(method="quantile_mapping",
                                obs=obsh[variable_col],
                                simh=simh[variable_col],
                                simp=simp[variable_col],
@@ -767,8 +773,11 @@ class MultiLayerPerceptron(CorrelBase):
                                ).to_dataframe()
 
         #postprocessing back to normal
-        #self.predicted_eqm.index = self.predicted_eqm.index.tz_localize(time_zone_site)
-        self.predicted_eqm.index.name = self.data.index.name
+        predicted_eqm.index = predicted_eqm.index.tz_localize(sim_tz)
+        predicted_eqm.index.name = self.data.index.name
+        
+        return predicted_eqm
+
 
 
 class OrthogonalLeastSquares(CorrelBase):
