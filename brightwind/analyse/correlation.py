@@ -16,6 +16,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from cmethods import adjust
+import matplotlib.pyplot as plt
+
 
 __all__ = ['']
 
@@ -648,24 +650,23 @@ class MultiLayerPerceptron(CorrelBase):
         self.solver=solver
         self.alpha=alpha
         self.max_iter=max_iter
-        self.ref_spd_col=ref_spd_col
-        self.tar_spd_col=tar_spd_col
-        self.ref_dir_col=ref_dir_col
-        self.tar_dir_col=tar_dir_col
-
-        self.ref_spd, self.target_spd = self.prepare(ref_spd, target_spd)
+        self.ref_spd, self.target_spd = self.prepare(ref_spd, target_spd, ref_spd_col, ref_dir_col, tar_spd_col, tar_dir_col)
 
         CorrelBase.__init__(self, ref_spd, target_spd, averaging_prd, 
                             ref_aggregation_method=ref_aggregation_method,
                             target_aggregation_method=target_aggregation_method
                             )
         
+        self._ref_spd_col_name =ref_spd_col
+        self._ref_dir_col_name =ref_dir_col
+        self._tar_dir_col_name =tar_dir_col
+        self._tar_spd_col_name =tar_spd_col
         self._ref_spd_fit_col_names = list(self._ref_spd_col_names.copy()) #first we copy the list so we can edit without causing issues
-        self._ref_spd_fit_col_names.remove(self.ref_spd_col)
-        self._ref_spd_fit_col_names.remove(self.ref_dir_col)
+        self._ref_spd_fit_col_names.remove(self._ref_spd_col_name)
+        self._ref_spd_fit_col_names.remove(self._ref_dir_col_name)
         self._tar_spd_fit_col_names = list(self._tar_spd_col_names.copy()) #first we copy the list so we can edit without causing issues
-        self._tar_spd_fit_col_names.remove(self.tar_spd_col)
-        self._tar_spd_fit_col_names.remove(self.tar_dir_col)
+        self._tar_spd_fit_col_names.remove(self._tar_spd_col_name)
+        self._tar_spd_fit_col_names.remove(self._tar_dir_col_name)
 
         self.model_ = None  # will hold the fitted pipeline
 
@@ -674,11 +675,11 @@ class MultiLayerPerceptron(CorrelBase):
     def __repr__(self):
         return 'Multi-layer Perceptron ' + str(self.params)
     
-    def prepare(self, ref_spd, target_spd):
+    def prepare(self, ref_spd, target_spd, ref_spd_col, ref_dir_col, tar_spd_col, tar_dir_col):
         #prepare ref_spd data        
         #go from polar to cartesian
-        ref_spd['cos_u'] = np.cos(np.deg2rad(ref_spd[self.ref_dir_col])) * ref_spd[self.ref_spd_col]
-        ref_spd['sin_u'] = np.sin(np.deg2rad(ref_spd[self.ref_dir_col])) * ref_spd[self.ref_spd_col]
+        ref_spd['cos_u'] = np.cos(np.deg2rad(ref_spd[ref_dir_col])) * ref_spd[ref_spd_col]
+        ref_spd['sin_u'] = np.sin(np.deg2rad(ref_spd[ref_dir_col])) * ref_spd[ref_spd_col]
         #then conver hour and month to polar domain, to facilitate ML training (as months and hours are cyclical)
         year_cos, year_sin = get_time_comps(ref_spd.index, 'year')
         ref_spd['time_of_year_cos'] = year_cos
@@ -688,8 +689,8 @@ class MultiLayerPerceptron(CorrelBase):
         ref_spd['time_of_day_sin'] = day_sin
 
         #prepare target_spd data 
-        target_spd['o_cos_u'] =  np.cos(np.deg2rad(target_spd[self.tar_dir_col])) * target_spd[self.tar_spd_col]
-        target_spd['o_sin_u'] =  np.sin(np.deg2rad(target_spd[self.tar_dir_col])) * target_spd[self.tar_spd_col]
+        target_spd['o_cos_u'] =  np.cos(np.deg2rad(target_spd[tar_dir_col])) * target_spd[tar_spd_col]
+        target_spd['o_sin_u'] =  np.sin(np.deg2rad(target_spd[tar_dir_col])) * target_spd[tar_spd_col]
         return ref_spd, target_spd
 
             
@@ -711,21 +712,38 @@ class MultiLayerPerceptron(CorrelBase):
             self.model_ = self.model()
         self.model_.fit(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
 
+        self.params = self.model_.get_params()
+        self.score = self.model_.score(self.data[self._ref_spd_fit_col_names], self.data[self._tar_spd_fit_col_names])
+
     def _predict(self, ref_spd):
         if self.model_ is None:
             raise RuntimeError("Model is not fitted. Call run() first.")
 
         #post processing
         predicted = pd.DataFrame(data=self.model_.predict(ref_spd), index=self.ref_spd.index, columns=['o_cos_u_Synthesized', 'o_sin_u_Synthesized'])
-        predicted[self.tar_spd_col] = np.sqrt(predicted['o_cos_u_Synthesized']**2 + predicted['o_sin_u_Synthesized']**2)
-        predicted[self.tar_dir_col] = np.mod(np.rad2deg(np.arctan2(predicted['o_sin_u_Synthesized'], predicted['o_cos_u_Synthesized'])),360)
+        predicted[self._tar_spd_col_name] = np.sqrt(predicted['o_cos_u_Synthesized']**2 + predicted['o_sin_u_Synthesized']**2)
+        predicted[self._tar_dir_col_name] = np.mod(np.rad2deg(np.arctan2(predicted['o_sin_u_Synthesized'], predicted['o_cos_u_Synthesized'])),360)
         
-        self.predicted = predicted[[self.tar_spd_col, self.tar_dir_col]]
+        self.predicted = predicted[[self._tar_spd_col_name, self._tar_dir_col_name]]
 
         predicted_eqm_ws = self.eqm(variable="Wind Speed")
         predicted_eqm_wd = self.eqm(variable="Wind Direction")
         predicted_eqm = predicted_eqm_ws.merge(predicted_eqm_wd, left_index=True, right_index=True)
         return predicted_eqm
+    
+    def plot(self, figure_size=(18, 10)):
+        fig, axes = plt.subplots(1, 2, figsize=figure_size)
+
+        plot_scatter(self.data[self._ref_spd_col_name],
+                     self.data[self._tar_spd_col_name],
+                     x_label=self._ref_spd_col_name + ' (training)', y_label=self._tar_spd_col_name + ' (training)',
+                     line_of_slope_1=True, figure_size=figure_size, ax=axes[0])
+        
+        plot_scatter(self.ref_spd[self._ref_spd_col_name],
+                     self.predicted[self._tar_spd_col_name],
+                     x_label=self._ref_spd_col_name + ' (predicted)', y_label=self._tar_spd_col_name + ' (predicted)',
+                     line_of_slope_1=True, figure_size=figure_size, ax=axes[1])
+        return fig
 
     def eqm(self, variable="Wind Speed"):
         #obsh = observation for the historical period
@@ -734,9 +752,9 @@ class MultiLayerPerceptron(CorrelBase):
 
         #format inputs
         if variable == "Wind Speed":
-            variable_col = self.tar_spd_col
+            variable_col = self._tar_spd_col_name
         elif variable == "Wind Direction":
-            variable_col = self.tar_dir_col
+            variable_col = self._tar_dir_col_name
         else:
             print("Error - variables can only be 'Wind Speed' or 'Wind Direction'")
 
