@@ -735,19 +735,22 @@ class MultiLayerPerceptron(CorrelBase):
         slope1, intercept1, r_value1, p_value1, std_err1 = scipy.stats.linregress(self.data[self._ref_spd_col_name], self.data[self._tar_spd_col_name])
         r2_1 = r_value1**2
 
-        slope2, intercept2, r_value2, p_value2, std_err2 = scipy.stats.linregress(self.ref_spd[self._ref_spd_col_name], self.predicted[self._tar_spd_col_name])
-        r2_2 = r_value2**2
-
         plot_scatter(self.data[self._ref_spd_col_name],
                      self.data[self._tar_spd_col_name],
                      slope1*self.data[self._ref_spd_col_name] + intercept1,
                      x_label=self._ref_spd_col_name + ' (training)', y_label=self._tar_spd_col_name + ' (training)',
                      line_of_slope_1=False, figure_size=figure_size, ax=axes[0], trendline_name= 'Linear trendline (linear R²={})'.format(round(r2_1,2)))
         
-        plot_scatter(self.ref_spd[self._ref_spd_col_name],
-                     self.predicted[self._tar_spd_col_name],
-                     slope2*self.ref_spd[self._ref_spd_col_name] + intercept2,
-                     x_label=self._ref_spd_col_name + ' (predicted)', y_label=self._tar_spd_col_name + ' (predicted)',
+        #we merge both measurements and predicted data to align coverage and have no nans
+        merged_data = self.data[[self._tar_spd_col_name]].merge(self.predicted[[self._tar_spd_col_name]], left_index=True, right_index=True,suffixes=(' (Measured)', ' (Predicted)'))
+
+        slope2, intercept2, r_value2, p_value2, std_err2 = scipy.stats.linregress(merged_data[self._tar_spd_col_name+' (Measured)'], merged_data[self._tar_spd_col_name+' (Predicted)'])
+        r2_2 = r_value2**2
+
+        plot_scatter(merged_data[self._tar_spd_col_name+' (Measured)'],
+                     merged_data[self._tar_spd_col_name+' (Predicted)'],
+                     slope2*merged_data[self._tar_spd_col_name+' (Measured)'] + intercept2,
+                     x_label=self._tar_spd_col_name + ' (Measured)', y_label=self._tar_spd_col_name + ' (Predicted)',
                      line_of_slope_1=False, figure_size=figure_size, ax=axes[1], trendline_name= 'Linear trendline (linear R²={})'.format(round(r2_2,2)))
         return fig
 
