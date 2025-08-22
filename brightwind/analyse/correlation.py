@@ -583,6 +583,8 @@ class MultiLayerPerceptron(CorrelBase):
     :type alpha:                      float
     :param max_iter:                  Maximum number of iteration of the MLPRegressor. See sklearn MLPRegressor documentation for more details.
     :type max_iter:                   int
+    :param random_state:              Determines random number generation for weights and bias initialization of the MLPRegressor. See sklearn MLPRegressor documentation for more details.
+    :type random_state:               int
 
     :returns:                         An object representing the multi layer perceptron with empirical quantile mapping fit model
 
@@ -636,6 +638,7 @@ class MultiLayerPerceptron(CorrelBase):
                  ref_spd_col, tar_spd_col, ref_dir_col, tar_dir_col, 
                  ref_aggregation_method='mean', target_aggregation_method='mean',
                  loss='squared_error', hidden_layer_sizes=(100,), activation='relu', solver='adam', alpha=1E-0, max_iter=1000,
+                 random_state=None
                  ):
 
         self.loss=loss
@@ -644,6 +647,7 @@ class MultiLayerPerceptron(CorrelBase):
         self.solver=solver
         self.alpha=alpha
         self.max_iter=max_iter
+        self.random_state=random_state
         self.ref_spd, self.target_spd = self.prepare(ref_spd, target_spd, ref_spd_col, ref_dir_col, tar_spd_col, tar_dir_col)
 
         CorrelBase.__init__(self, ref_spd, target_spd, averaging_prd, 
@@ -702,7 +706,8 @@ class MultiLayerPerceptron(CorrelBase):
                 activation=self.activation,
                 solver=self.solver,
                 alpha=self.alpha,
-                max_iter=self.max_iter
+                max_iter=self.max_iter,
+                random_state=self.random_state #for testing and reproducibility purposes
                 ),
                 )
 
