@@ -57,8 +57,8 @@ class CorrelBase:
         self._ref_spd_col_name = ref_spd.name if ref_spd is not None and isinstance(ref_spd, pd.Series) else None
         self._ref_spd_col_names = ref_spd.columns if ref_spd is not None and isinstance(ref_spd, pd.DataFrame) else None
         self._ref_dir_col_name = ref_dir.name if ref_dir is not None and isinstance(ref_dir, pd.Series) else None
-        self._tar_spd_col_name = target_spd.name if target_spd is not None and isinstance(ref_spd, pd.Series) else None
-        self._tar_dir_col_name = target_dir.name if target_dir is not None and isinstance(ref_spd, pd.Series) else None
+        self._tar_spd_col_name = target_spd.name if target_spd is not None and isinstance(target_spd, pd.Series) else None
+        self._tar_dir_col_name = target_dir.name if target_dir is not None and isinstance(target_dir, pd.Series) else None
         self._tar_spd_col_names = target_spd.columns if target_spd is not None and isinstance(target_spd, pd.DataFrame) else None
 
 
@@ -229,9 +229,15 @@ class CorrelBase:
                                                                                     self._tar_spd_col_name,
                                                                                     input1_suffix='_ref')
             self.ref_spd = self.ref_spd.rename(self._ref_spd_col_name)
-        elif isinstance(self.ref_spd, pd.DataFrame) and self._ref_spd_col_names is not None:
+        elif isinstance(self.ref_spd, pd.DataFrame) and isinstance(self.target_spd, pd.DataFrame) and self._ref_spd_col_names is not None:
             self._ref_spd_col_names = self._rename_equal_elements_between_two_inputs(list(self._ref_spd_col_names),
                                                                                      list(self._tar_spd_col_names),
+                                                                                     input1_suffix='_ref')
+            self.ref_spd.columns = self._ref_spd_col_names
+            
+        elif isinstance(self.ref_spd, pd.DataFrame) and isinstance(self.target_spd, pd.Series) and self._ref_spd_col_names is not None:
+            self._ref_spd_col_names = self._rename_equal_elements_between_two_inputs(list(self._ref_spd_col_names),
+                                                                                     self._tar_spd_col_name,
                                                                                      input1_suffix='_ref')
             self.ref_spd.columns = self._ref_spd_col_names
 
