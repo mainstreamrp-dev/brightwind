@@ -17,6 +17,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from cmethods import adjust
 import matplotlib.pyplot as plt
+import scipy
 
 
 __all__ = ['']
@@ -528,37 +529,31 @@ class OrdinaryLeastSquares(CorrelBase):
 
 class MultiLayerPerceptron(CorrelBase):
     """
-    Correlate two datasets against each other using the Ordinary Least Squares method. This accepts two wind speed
-    Series with timestamps as indexes and an averaging period which merges the datasets by this time period before
+    Correlate two datasets against each other using a Multi Layer Perceptron neural network combined with empirical quantile mapping. 
+    This accepts two dataframes as inputs each one must have wind speed and wind direction other parameters are optional, but 
+    temperature and pressure are recommended to be used for X as well. 
+    An averaging period which merges the datasets by this time period should be added also, however 
+    note that using averaging larger than 1h is not recommended,  before
     performing the correlation.
 
-    :param ref_spd:                   Series containing reference wind speed as a column, timestamp as the index.
-    :type ref_spd:                    pd.Series
-    :param target_spd:                Series containing target wind speed as a column, timestamp as the index.
-    :type target_spd:                 pd.Series
+    :param ref_spd:                   Series containing reference wind speed and direction as columns (optionally more columns can be passed to be used for the correlation), timestamp as the index.
+    :type ref_spd:                    pd.DataFrame
+    :param target_spd:                Series containing target wind speed and wind direction as columns, timestamp as the index.
+    :type target_spd:                 pd.DataFrame
     :param averaging_prd:             Groups data by the time period specified here. The following formats are supported
 
             - Set period to '10min' for 10 minute average, '30min' for 30 minute average.
-            - Set period to '1h' for hourly average, '3h' for three hourly average and so on for '4h', '6h' etc.
-            - Set period to '1D' for a daily average, '3D' for three day average, similarly '5D', '7D', '15D' etc.
-            - Set period to '1W' for a weekly average, '3W' for three week average, similarly '2W', '4W' etc.
-            - Set period to '1M' for monthly average with the timestamp at the start of the month.
-            - Set period to '1A' for annual average with the timestamp at the start of the year.
+            - Set period to '1h' for hourly average
 
     :type averaging_prd:              str
-    :param coverage_threshold:        Minimum coverage required when aggregating the data to the averaging_prd.
-    :type coverage_threshold:         float
-    :param ref_dir:                   Series containing reference wind direction as a column, timestamp as the index.
-    :type ref_dir:                    pd.Series
-    :param sectors:                   Number of direction sectors to bin in to. The first sector is centered at 0 by
-                                      default. To change that behaviour specify 'direction_bin_array' which overwrites
-                                      'sectors'.
-    :type sectors:                    int
-    :param direction_bin_array:       An optional parameter where if you want custom direction bins, pass an array
-                                      of the bins. To add custom bins for direction sectors, overwrites sectors. For
-                                      instance, for direction bins [0,120), [120, 215), [215, 360) the list would
-                                      be [0, 120, 215, 360]
-    :type direction_bin_array:        List()
+    :param ref_spd_col:               name of the reference wind speed column
+    :type ref_spd_col:                str
+    :param tar_spd_col:               name of the target wind speed column
+    :type tar_spd_col:                str
+    :param ref_dir_col:               name of the reference wind direction column
+    :type ref_dir_col:                str
+    :param tar_dir_col:               name of the target wind direction column
+    :type tar_dir_col:                str
     :param ref_aggregation_method:    Default `mean`, returns the mean of the data for the specified period. Can also
                                       use `median`, `prod`, `sum`, `std`,`var`, `max`, `min` which are shorthands for
                                       median, product, summation, standard deviation, variance, maximum and minimum
@@ -569,74 +564,66 @@ class MultiLayerPerceptron(CorrelBase):
                                       median, product, summation, standard deviation, variance, maximum and minimum
                                       respectively.
     :type target_aggregation_method:  str
-    :param forced_intercept_origin:   Default False; if set to True will force the regression to pass through [0; 0]
-    :type forced_intercept_origin:    boolean
-    :returns:                         An object representing ordinary least squares fit model
+    :param loss:                      The loss function of the MLPRegressor to use when training the weights. See sklearn MLPRegressor documentation for more details.
+    :type loss:                       str
+    :param hidden_layer_sizes:        The ith element of the MLPRegressor represents the number of neurons in the ith hidden layer. See sklearn MLPRegressor documentation for more details.
+    :type hidden_layer_sizes:         tuple
+    :param activation:                Activation function of the MLPRegressor for the hidden layer. See sklearn MLPRegressor documentation for more details.
+    :type activation:                 str
+    :param solver:                    The solver of the MLPRegressor for weight optimization. See sklearn MLPRegressor documentation for more details.
+    :type solver:                     str
+    :param alpha:                     Strength of the L2 regularization term for the MLPRegressor. See sklearn MLPRegressor documentation for more details.
+    :type alpha:                      float
+    :param max_iter:                  Maximum number of iteration of the MLPRegressor. See sklearn MLPRegressor documentation for more details.
+    :type max_iter:                   int
+
+    :returns:                         An object representing the multi layer perceptron with empirical quantile mapping fit model
 
     **Example usage**
     ::
         import brightwind as bw
         data = bw.load_csv(bw.demo_datasets.demo_data)
         m2_ne = bw.load_csv(bw.demo_datasets.demo_merra2_NE)
-        m2_nw = bw.load_csv(bw.demo_datasets.demo_merra2_NW)
 
         # Correlate wind speeds on a monthly basis.
-        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'], averaging_prd='1M',
-                                                 coverage_threshold=0.95)
-        ols_cor.run()
+        mlp = bw.Correl.MultiLayerPerceptron(m2_ne[[v_wsnode,v_wdnode, v_tnode, v_pnode]].dropna(), 
+                                     data[[o_wsnode, o_wdnode]].dropna(),
+                                     alpha=1,
+                                     ref_spd_col=v_wsnode,
+                                     tar_spd_col=o_wsnode,
+                                     ref_dir_col=v_wdnode,
+                                     tar_dir_col=o_wdnode,
+                                     averaging_prd='1h'
+                                     )
+        mlp.run()
 
-        # To plot the scatter plot and regression line.
-        ols_cor.plot()
+        # To plot the scatter plot of target vs reference wind speed, for training and predicted periods 
+        mlp.plot()
 
         # To change the plot's size.
-        ols_cor.plot(figure_size=(12,15))
+        mlp.plot(figure_size=(12,15))
 
-        # To show the resulting parameters.
-        ols_cor.params
+        # To show the model parameters.
+        mlp.params
         # or
-        ols_cor.show_params()
+        mlp.show_params()
 
-        # To synthesize data at the target site.
-        ols_cor.synthesize()
-
-        # To synthesize data at the target site using a different external reference dataset.
-        ols_cor.synthesize(ext_input=m2_nw['WS50m_m/s'])
-
-        # To run the correlation without immediately showing results.
-        ols_cor.run(show_params=False)
+        # To synthesize data at the target site - ext_input is recommended to be passed as below to not splice data for the training period
+        mlp.synthesize(ext_input=mlp.ref_spd[mlp._ref_spd_fit_col_names])
 
         # To retrieve the merged and aggregated data used in the correlation.
-        ols_cor.data
+        mlp.data
 
         # To retrieve the number of data points used for the correlation
-        ols_cor.num_data_pts
+        mlp.num_data_pts
 
         # To retrieve the input parameters.
-        ols_cor.averaging_prd
-        ols_cor.coverage_threshold
-        ols_cor.ref_spd
-        ols_cor.ref_aggregation_method
-        ols_cor.target_spd
-        ols_cor.target_aggregation_method
+        mlp.averaging_prd
+        mlp.ref_spd
+        mlp.ref_aggregation_method
+        mlp.target_spd
+        mlp.target_aggregation_method
 
-        # Correlate temperature on an hourly basis using a different aggregation method.
-        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['T2M_degC'], data['T2m'],
-                                                 averaging_prd='1h', coverage_threshold=0,
-                                                 ref_aggregation_method='min', target_aggregation_method='min')
-
-        # Correlate wind speeds on a monthly basis and force the intercept through the origin.
-        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'], averaging_prd='1M',
-                                                 coverage_threshold=0.95, forced_intercept_origin=True)
-
-        # Correlate by directional sector, using 36 sectors.
-        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'],
-                                                ref_dir=m2_ne['WD50m_deg'], averaging_prd='1D',
-                                                coverage_threshold=0.9, sectors=36)
-
-        # Correlate by directional sector forcing the intercept through the origin.
-        ols_cor = bw.Correl.OrdinaryLeastSquares(m2_ne['WS50m_m/s'], data['Spd80mN'],
-                                                 ref_dir=m2_ne['WD50m_deg'], averaging_prd='1h',
-                                                 coverage_threshold=0.9, forced_intercept_origin=True)
     """
     def __init__(self, ref_spd, target_spd, averaging_prd, 
                  ref_spd_col, tar_spd_col, ref_dir_col, tar_dir_col, 
@@ -733,16 +720,23 @@ class MultiLayerPerceptron(CorrelBase):
     
     def plot(self, figure_size=(18, 10)):
         fig, axes = plt.subplots(1, 2, figsize=figure_size)
+        slope1, intercept1, r_value1, p_value1, std_err1 = scipy.stats.linregress(self.data[self._ref_spd_col_name], self.data[self._tar_spd_col_name])
+        r2_1 = r_value1**2
+
+        slope2, intercept2, r_value2, p_value2, std_err2 = scipy.stats.linregress(self.ref_spd[self._ref_spd_col_name], self.predicted[self._tar_spd_col_name])
+        r2_2 = r_value2**2
 
         plot_scatter(self.data[self._ref_spd_col_name],
                      self.data[self._tar_spd_col_name],
+                     slope1*self.data[self._ref_spd_col_name] + intercept1,
                      x_label=self._ref_spd_col_name + ' (training)', y_label=self._tar_spd_col_name + ' (training)',
-                     line_of_slope_1=True, figure_size=figure_size, ax=axes[0])
+                     line_of_slope_1=False, figure_size=figure_size, ax=axes[0], trendline_name= 'Linear trendline (linear R²={})'.format(round(r2_1,2)))
         
         plot_scatter(self.ref_spd[self._ref_spd_col_name],
                      self.predicted[self._tar_spd_col_name],
+                     slope2*self.ref_spd[self._ref_spd_col_name] + intercept2,
                      x_label=self._ref_spd_col_name + ' (predicted)', y_label=self._tar_spd_col_name + ' (predicted)',
-                     line_of_slope_1=True, figure_size=figure_size, ax=axes[1])
+                     line_of_slope_1=False, figure_size=figure_size, ax=axes[1], trendline_name= 'Linear trendline (linear R²={})'.format(round(r2_2,2)))
         return fig
 
     def eqm(self, variable="Wind Speed"):
@@ -779,6 +773,8 @@ class MultiLayerPerceptron(CorrelBase):
         if simp_df.index.tz:
             sim_tz = str(simp_df.index.tz)
             simp_df.index = simp_df.index.tz_localize(None)
+        else:
+            sim_tz = None
         simp = simp_df.to_xarray()
 
         predicted_eqm = adjust(method="quantile_mapping",
