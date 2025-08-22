@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import re
 from typing import List
 from brightwind.transform import transform as tf
 from brightwind.analyse.plot import plot_scatter, plot_scatter_by_sector, plot_scatter_wdir
@@ -657,7 +658,11 @@ class MultiLayerPerceptron(CorrelBase):
 
         self.model_ = None  # will hold the fitted pipeline
 
-
+        #check if time resolution larger than hours
+        if isinstance(averaging_prd, str):
+            strlist = re.split('(\\d+)', averaging_prd)
+            if strlist[-1] not in ['min', 'h', 'H']:
+                print("The averaging_prd is greater than hours, which is not recommended for the MLP method. Consider updating it to 10min or 1h.")
 
     def __repr__(self):
         return 'Multi-layer Perceptron ' + str(self.params)
@@ -682,6 +687,7 @@ class MultiLayerPerceptron(CorrelBase):
 
             
     def model(self):
+        #we pass a pipeline and use StandardScaler to scale the inputs, as recomended by MLPRegressor doc
         return make_pipeline(
             StandardScaler(),
             MLPRegressor(
